@@ -1,6 +1,27 @@
+/**
+ * LoRaLink.cpp - LoRa radio communication implementation
+ * 
+ * Copyright (C) 2025 Michael Garcia, M&E Design
+ * Based on original .ino by Geoff Mcintyre of Mr.Industries (https://mr.industries/)
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "LoRaLink.h"
 #include "GlobalContext.h"
 #include "SensorDataAccess.h"
+#include "Logger.h"
 #include <cmath>
 
 bool initializeLoRa() {
@@ -18,25 +39,18 @@ bool initializeLoRa() {
   
   Serial.println("Attempting LoRa.begin(915E6)...");
   if (!LoRa.begin(915E6)) {
-    Serial.println("✗✗✗ Starting LoRa FAILED! ✗✗✗");
-    Serial.println("\nPossible issues:");
-    Serial.println("1. Check LoRa module wiring");
-    Serial.println("2. Verify pin definitions match your board");
-    Serial.println("3. Ensure LoRa module has power (3.3V)");
-    Serial.println("4. Check antenna is connected");
-    Serial.println("========================================\n");
+    logError("LoRa initialization failed at 915MHz");
+    logInfo("Check: wiring, pin definitions, 3.3V power, antenna connection");
     return false;
   }
   
-  Serial.println("✓✓✓ LoRa initialized successfully! ✓✓✓");
+  logNetworkEvent("LoRa", "INITIALIZED", "915MHz ready for transmission");
   getGlobalContext().loraActive = true;
   
-  Serial.println("Creating LoRa hub...");
+  logInfo("Creating LoRa sensor hub configuration");
   delay(100);
   
   createHub("Greenhouse", "Temperature,Humidity,Lux,Distance", "1,2,1,2");
-  
-  Serial.println("========================================\n");
   return true;
 }
 
@@ -98,18 +112,8 @@ void pushAllData(const char* hubName) {
     return;
   }
   
-  Serial.println("=== Sensor Readings ===");
-  Serial.print("Temperature: ");
-  Serial.print(temp);
-  Serial.println("°C");
-  Serial.print("Humidity: ");
-  Serial.print(humidity, 1);
-  Serial.println("%");
-  Serial.print("Lux: ");
-  Serial.println(lux);
-  Serial.print("Distance: ");
-  Serial.print(distance, 2);
-  Serial.println(" in");
+  // Log structured sensor telemetry data
+  logSensorData(temp, humidity, lux, distance);
   
   if (!LoRa.beginPacket()) {
     Serial.println("ERROR: Failed to begin LoRa packet");
@@ -131,12 +135,11 @@ void pushAllData(const char* hubName) {
   LoRa.print(",");
   
   if (!LoRa.endPacket()) {
-    Serial.println("ERROR: Failed to send LoRa packet");
+    logError("LoRa packet transmission failed");
     return;
   }
   
-  Serial.println("  -> LoRa: Sent all sensor data!");
-  Serial.println("=======================\n");
+  logNetworkEvent("LoRa", "DATA_TX", "Sensor data transmitted successfully");
   
   getGlobalContext().sensors.lastLoRaTransmit = millis();
 }

@@ -1,9 +1,31 @@
+/**
+ * Commands.cpp - Serial command interface implementation
+ * 
+ * Copyright (C) 2025 Michael Garcia, M&E Design
+ * Based on original .ino by Geoff Mcintyre of Mr.Industries (https://mr.industries/)
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "Commands.h"
 #include "GlobalContext.h"
 #include "Config.h"
 #include "Sensors.h"
 #include "LoRaLink.h"
 #include "NowLink.h"
+#include "EventQueue.h"
+#include "Logger.h"
 #include "WiFi.h"
 #include <cstring>
 
@@ -113,16 +135,15 @@ void cmdSensors(const char *args) {
 
 void cmdSend(const char *args) {
   if (!getGlobalContext().loraActive) {
-    Serial.println("⚠️  LoRa not active!");
+    logWarn("LoRa transmission requested but radio not active");
     return;
   }
 
   const char *hubName = (args && args[0]) ? args : "Greenhouse";
-
-  Serial.print("Sending LoRa packet now (hub: ");
-  Serial.print(hubName);
-  Serial.println(")...");
-  pushAllData(hubName);
+  logInfo("Manual LoRa transmission requested for hub: %s", hubName);
+  
+  // Send asynchronous LoRa transmission request to communications task
+  sendEvent(EVENT_LORA_SEND_REQUEST);
 }
 
 void cmdStatus(const char *args) {
@@ -148,12 +169,13 @@ void cmdStatus(const char *args) {
 }
 
 void cmdLora(const char *args) {
-  Serial.println("Retrying LoRa initialization...");
+  logInfo("Manual LoRa initialization retry requested");
   initializeLoRa();
 }
 
 void cmdReset(const char *args) {
-  Serial.println("Restarting device...");
+  logSystemEvent("SYSTEM_RESTART", "Manual restart requested via command");
+  delay(100); // Allow log message to be sent
   ESP.restart();
 }
 

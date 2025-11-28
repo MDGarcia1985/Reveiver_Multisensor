@@ -1,7 +1,28 @@
+/**
+ * Sensors.cpp - Environmental sensor interface implementation
+ * 
+ * Copyright (C) 2025 Michael Garcia, M&E Design
+ * Based on original .ino by Geoff Mcintyre of Mr.Industries (https://mr.industries/)
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "Sensors.h"
 #include "GlobalContext.h"
 #include "SensorDataAccess.h"
 #include "Tasks.h"
+#include "Logger.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include <cmath>
@@ -16,21 +37,19 @@ void initializeSensors() {
   Serial.print(", SCL: GPIO");
   Serial.println(PIN_I2C_SCL);
   
-  Serial.print("Initializing TSL2561 light sensor... ");
+  logInfo("Initializing I2C environmental sensors");
+  
   if (!tsl.begin()) {
-    Serial.println("FAILED!");
-    Serial.println("⚠️  No TSL2561 detected. Light readings will be 0.");
+    logWarn("TSL2561 light sensor not detected - readings will be zero");
   } else {
     configureTSL2561();
-    Serial.println("OK!");
+    logInfo("TSL2561 light sensor initialized successfully");
   }
 
-  Serial.print("Initializing HTU21D-F temp/humidity sensor... ");
   if (!htu.begin()) {
-    Serial.println("FAILED!");
-    Serial.println("⚠️  No HTU21D-F detected. Temp/humidity will be 0.");
+    logWarn("HTU21D-F temp/humidity sensor not detected - readings will be zero");
   } else {
-    Serial.println("OK!");
+    logInfo("HTU21D-F temperature/humidity sensor initialized successfully");
   }
 }
 

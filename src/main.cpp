@@ -1,19 +1,24 @@
 /**
  * ESP32 Multi-Sensor Hub with ESP-NOW + LoRa
  * 
+ * Copyright (C) 2025 Michael Garcia, M&E Design
+ * Based on original .ino by Geoff Mcintyre of Mr.Industries (https://mr.industries/)
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * 
  * A modular, thread-safe sensor data collection and transmission system
  * using FreeRTOS tasks for concurrent operations.
- * 
- * Features:
- * - Environmental sensors: Temperature, Humidity, Light
- * - Distance measurement via ESP-NOW communication
- * - LoRa wireless data transmission
- * - Thread-safe sensor data access with mutex protection
- * - Serial command interface for configuration and control
- * 
- * License: Open Source - see LICENSE file
- * Author: [Your Name]
- * Version: 1.0
  */
 
 #include <Arduino.h>
@@ -26,6 +31,8 @@
 #include "Config.h"
 #include "Commands.h"
 #include "Tasks.h"
+#include "EventQueue.h"
+#include "Logger.h"
 
 /**
  * System initialization and task creation
@@ -40,38 +47,48 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  Serial.println("\n=== ESP32 Multi-Sensor Hub with ESP-NOW + LoRa ===");
-  Serial.println("Sensors: Temperature, Humidity, Light, Ultrasonic Distance\n");
+  // Initialize logging system for structured output and telemetry
+  initLogger(LOG_INFO, SINK_SERIAL);
+  
+  logInfo("ESP32 Multi-Sensor Hub with ESP-NOW + LoRa");
+  logInfo("Sensors: Temperature, Humidity, Light, Ultrasonic Distance");
+  logSystemEvent("SYSTEM_STARTUP", "Initializing subsystems");
 
-  // Initialize centralized state management
+  // Initialize centralized system state management
   initializeGlobalContext();
   
-  // Initialize I2C sensors (TSL2561, HTU21D-F)
+  // Initialize FreeRTOS event queue for inter-task communication
+  if (!initEventQueue()) {
+    logCritical("Failed to create event queue - system halted");
+    return;
+  }
+  logSystemEvent("EVENT_QUEUE_INIT", "Inter-task communication ready");
+  
+  // Initialize I2C environmental sensors (TSL2561 light, HTU21D-F temp/humidity)
   initializeSensors();
   
-  // Initialize EEPROM for persistent configuration
+  // Initialize EEPROM for persistent MAC address storage
   initializeConfig();
   
-  // Initialize LoRa radio for data transmission
+  // Initialize LoRa radio module for wireless data transmission
   if (!initializeLoRa()) {
-    Serial.println("⚠️  WARNING: LoRa initialization failed!");
-    Serial.println("⚠️  Sensors will read but no LoRa transmission!");
-    Serial.println("⚠️  Type 'lora' to retry.\n");
+    logWarn("LoRa initialization failed - sensors will read but no transmission");
+    logInfo("Type 'lora' command to retry LoRa initialization");
   }
 
-  // Initialize ESP-NOW for peer-to-peer communication
+  // Initialize ESP-NOW peer-to-peer communication from stored configuration
   initializeNowFromEEPROM();
   
-  // Display available commands to user
+  // Display system status and available serial commands
   printStartupInfo();
   
-  // Perform initial sensor reading
+  // Perform initial environmental sensor reading
   readEnvironmentalSensors();
   
-  // Create concurrent FreeRTOS tasks for system operation
+  // Create FreeRTOS tasks for concurrent sensor sampling and communication
   createTasks();
   
-  Serial.println("FreeRTOS tasks created - system running\n");
+  logSystemEvent("TASKS_CREATED", "FreeRTOS multitasking system operational");
 }
 
 /**

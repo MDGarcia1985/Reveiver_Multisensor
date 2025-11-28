@@ -1,8 +1,30 @@
+/**
+ * NowLink.cpp - ESP-NOW peer communication implementation
+ * 
+ * Copyright (C) 2025 Michael Garcia, M&E Design
+ * Based on original .ino by Geoff Mcintyre of Mr.Industries (https://mr.industries/)
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "NowLink.h"
 #include "GlobalContext.h"
 #include "Config.h"
 #include "SensorDataAccess.h"
 #include "Tasks.h"
+#include "EventQueue.h"
+#include "Logger.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include <cstring>
@@ -25,14 +47,12 @@ bool initializeNowSerial(uint8_t* mac) {
   ctx.nowSerial = new ESP_NOW_Serial_Class(peer_mac, ESPNOW_WIFI_CHANNEL, ESPNOW_WIFI_IF);
 
   if (ctx.nowSerial->begin(115200)) {
-    Serial.println("✓ ESP-NOW communication started successfully!");
+    logNetworkEvent("ESP-NOW", "CONNECTED", "Peer communication established");
     setMacAddress(mac);
     ctx.nowSerialActive = true;
-    Serial.println("-----------------------------\n");
     return true;
   } else {
-    Serial.println("✗ Failed to start ESP-NOW communication");
-    Serial.println("-----------------------------\n");
+    logNetworkEvent("ESP-NOW", "CONNECT_FAILED", "Unable to establish peer communication");
     delete ctx.nowSerial;
     ctx.nowSerial = nullptr;
     return false;
@@ -112,9 +132,11 @@ namespace {
     }
 
     if (setSensorDistance(distance)) {
-      Serial.print("ESP-NOW: Distance updated -> ");
-      Serial.print(distance, 2);
-      Serial.println(" in");
+      logNetworkEvent("ESP-NOW", "DISTANCE_RX", nullptr);
+      logDebug("Distance sensor updated: %.2f inches", distance);
+      
+      // Broadcast distance update event to other tasks (distance in cm * 100)
+      sendEvent(EVENT_DISTANCE_UPDATED, (uint32_t)(distance * 100));
     }
 
     ctx.receivedMessageLen = 0;
