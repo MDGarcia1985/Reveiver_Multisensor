@@ -87,39 +87,66 @@ bool parseDistance(const char* message, float* distance) {
   return false;
 }
 
-void handleNowMessages() {
-  GlobalContext& ctx = getGlobalContext();
-  if (ctx.nowSerialActive && ctx.nowSerial != nullptr && ctx.nowSerial->available()) {
-    int bytesProcessed = 0;
-    const int maxBytesPerLoop = 32;
-    
-    while (ctx.nowSerial->available() && bytesProcessed < maxBytesPerLoop) {
-      char receivedChar = ctx.nowSerial->read();
-      bytesProcessed++;
+namespace {
+  constexpr int MAX_BYTES_PER_LOOP = 32;
+  constexpr char MIN_PRINTABLE = 32;
+  constexpr char MAX_PRINTABLE = 126;
 
-      if (receivedChar == '\n') {
-        if (ctx.receivedMessageLen > 0 && ctx.receivedMessageLen < (int)sizeof(ctx.receivedMessageBuffer)) {
-          ctx.receivedMessageBuffer[ctx.receivedMessageLen] = '\0';
-          
-          float distance;
-          if (parseDistance(ctx.receivedMessageBuffer, &distance)) {
-            if (setSensorDistance(distance)) {
-              Serial.print("ESP-NOW: Distance updated -> ");
-              Serial.print(distance, 2);
-              Serial.println(" in");
-            }
-          }
-          
-          ctx.receivedMessageLen = 0;
-        }
-      } else if (receivedChar != '\r' && receivedChar >= 32 && receivedChar <= 126) {
-        if (ctx.receivedMessageLen < (int)sizeof(ctx.receivedMessageBuffer) - 1) {
-          ctx.receivedMessageBuffer[ctx.receivedMessageLen++] = receivedChar;
-        } else {
-          ctx.receivedMessageLen = 0;
-        }
+  inline bool isPrintableNowChar(char c) {
+    return (c != '\r') && (c >= MIN_PRINTABLE) && (c <= MAX_PRINTABLE);
+  }
+
+  void handleCompleteNowLine(GlobalContext &ctx) {
+    if (ctx.receivedMessageLen == 0 ||
+        ctx.receivedMessageLen >= (int)sizeof(ctx.receivedMessageBuffer)) {
+      ctx.receivedMessageLen = 0;
+      return;
+    }
+
+    ctx.receivedMessageBuffer[ctx.receivedMessageLen] = '\0';
+
+    float distance = 0.0f;
+    if (!parseDistance(ctx.receivedMessageBuffer, &distance)) {
+      ctx.receivedMessageLen = 0;
+      return;
+    }
+
+    if (setSensorDistance(distance)) {
+      Serial.print("ESP-NOW: Distance updated -> ");
+      Serial.print(distance, 2);
+      Serial.println(" in");
+    }
+
+    ctx.receivedMessageLen = 0;
+  }
+}
+
+void handleNowMessages() {
+  GlobalContext &ctx = getGlobalContext();
+  auto *now = ctx.nowSerial;
+
+  // Fast exit if nothing to do
+  if (!ctx.nowSerialActive || now == nullptr || !now->available()) {
+    return;
+  }
+
+  int bytesProcessed = 0;
+
+  while (now->available() && bytesProcessed < MAX_BYTES_PER_LOOP) {
+    char c = now->read();
+    ++bytesProcessed;
+
+    if (c == '\n') {
+      handleCompleteNowLine(ctx);
+    } else if (isPrintableNowChar(c)) {
+      if (ctx.receivedMessageLen < (int)sizeof(ctx.receivedMessageBuffer) - 1) {
+        ctx.receivedMessageBuffer[ctx.receivedMessageLen++] = c;
+      } else {
+        // Overflow: drop current line
+        ctx.receivedMessageLen = 0;
       }
     }
+    // (all other chars are ignored)
   }
 }
 
