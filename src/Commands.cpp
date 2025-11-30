@@ -64,14 +64,14 @@ void parseCommand(char *line, char *cmd, char *args) {
   char *space = strchr(line, ' ');
   if (space) {
     *space = '\0';
-    strncpy(args, space + 1, 29);
-    args[29] = '\0';
+    strncpy(args, space + 1, 28);  // Leave room for null terminator
+    args[28] = '\0';
   } else {
     args[0] = '\0';
   }
 
   int i = 0;
-  for (char *p = line; *p && i < 19; ++p, ++i) {
+  for (char *p = line; *p && i < 18; ++p, ++i) {  // Leave room for null terminator
     cmd[i] = tolower(*p);
   }
   cmd[i] = '\0';

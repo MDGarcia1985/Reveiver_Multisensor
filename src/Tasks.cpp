@@ -32,36 +32,28 @@ SemaphoreHandle_t sensorDataMutex = NULL;
 void createTasks() {
   // Create mutex for sensor data protection
   sensorDataMutex = xSemaphoreCreateMutex();
+  if (!sensorDataMutex) {
+    Serial.println("CRITICAL: Failed to create sensor data mutex");
+    return;
+  }
   
   // Create sensor sampling task
-  xTaskCreate(
-    sensorTask,
-    "SensorTask",
-    SENSOR_TASK_STACK,
-    NULL,
-    SENSOR_TASK_PRIORITY,
-    NULL
-  );
+  if (xTaskCreate(sensorTask, "SensorTask", SENSOR_TASK_STACK, NULL, SENSOR_TASK_PRIORITY, NULL) != pdPASS) {
+    Serial.println("CRITICAL: Failed to create sensor task");
+    return;
+  }
   
   // Create communications task
-  xTaskCreate(
-    commsTask,
-    "CommsTask", 
-    COMMS_TASK_STACK,
-    NULL,
-    COMMS_TASK_PRIORITY,
-    NULL
-  );
+  if (xTaskCreate(commsTask, "CommsTask", COMMS_TASK_STACK, NULL, COMMS_TASK_PRIORITY, NULL) != pdPASS) {
+    Serial.println("CRITICAL: Failed to create communications task");
+    return;
+  }
   
   // Create command handling task
-  xTaskCreate(
-    commandTask,
-    "CommandTask",
-    COMMAND_TASK_STACK,
-    NULL,
-    COMMAND_TASK_PRIORITY,
-    NULL
-  );
+  if (xTaskCreate(commandTask, "CommandTask", COMMAND_TASK_STACK, NULL, COMMAND_TASK_PRIORITY, NULL) != pdPASS) {
+    Serial.println("CRITICAL: Failed to create command task");
+    return;
+  }
 }
 
 void sensorTask(void* parameter) {

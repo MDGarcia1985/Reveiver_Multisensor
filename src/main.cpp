@@ -1,5 +1,6 @@
 /**
  * ESP32 Multi-Sensor Hub with ESP-NOW + LoRa
+ * Version: 2.0.0
  * 
  * Copyright (C) 2025 Michael Garcia, M&E Design
  * Based on original .ino by Geoff Mcintyre of Mr.Industries (https://mr.industries/)

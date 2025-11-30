@@ -1,6 +1,6 @@
-# ESP32 Multi-Sensor Hub
+# ESP32 Multi-Sensor Hub v2.0.0
 
-A modular, thread-safe sensor data collection and transmission system using FreeRTOS tasks for concurrent operations.
+A production-ready, modular sensor data collection and transmission system using FreeRTOS tasks for concurrent operations with professional logging and event-driven architecture.
 
 ## Features
 
@@ -8,6 +8,8 @@ A modular, thread-safe sensor data collection and transmission system using Free
 - **Distance Measurement**: Ultrasonic distance data via ESP-NOW peer communication
 - **Wireless Transmission**: LoRa radio for long-range data transmission
 - **Thread-Safe Design**: FreeRTOS tasks with mutex-protected sensor data access
+- **Event-Driven Architecture**: Inter-task communication via FreeRTOS queues
+- **Professional Logging**: Multi-level logging with telemetry abstraction
 - **Interactive Control**: Serial command interface for configuration and monitoring
 - **Hardware Portability**: Clean pin abstraction for different ESP32 variants
 
@@ -28,12 +30,27 @@ I2C Sensors:
 - SCL: GPIO 22
 
 LoRa Module:
-- SCK:  GPIO 18
-- MISO: GPIO 19  
-- MOSI: GPIO 23
+- SCK:  GPIO 18 (SCK)
+- MISO: GPIO 19 (MISO)
+- MOSI: GPIO 23 (MOSI)
 - CS:   GPIO 12
 - RST:  GPIO 13
 - DIO0: GPIO 11
+```
+
+#### ESP32-S3
+```
+I2C Sensors:
+- SDA: GPIO 8
+- SCL: GPIO 9
+
+LoRa Module:
+- SCK:  GPIO 12
+- MISO: GPIO 13
+- MOSI: GPIO 11
+- CS:   GPIO 10
+- RST:  GPIO 9
+- DIO0: GPIO 8
 ```
 
 See `src/pins.h` for other board configurations.
@@ -42,21 +59,35 @@ See `src/pins.h` for other board configurations.
 
 ### Modular Design
 ```
-main.cpp           - System initialization and FreeRTOS task creation
-├── GlobalContext  - Centralized state management
-├── Sensors        - Environmental sensor interface
-├── LoRaLink       - LoRa radio communication
-├── NowLink        - ESP-NOW peer communication  
-├── Config         - EEPROM configuration management
-├── Commands       - Serial command interface
-├── Tasks          - FreeRTOS task definitions
-└── pins.h         - Hardware pin abstraction
+main.cpp              - System initialization and FreeRTOS task creation
+├── GlobalContext     - Centralized state management
+├── Sensors           - Environmental sensor interface
+├── SensorDataAccess  - Thread-safe sensor data access layer
+├── LoRaLink          - LoRa radio communication
+├── NowLink           - ESP-NOW peer communication  
+├── Config            - EEPROM configuration management
+├── Commands          - Serial command interface
+├── Tasks             - FreeRTOS task definitions
+├── EventQueue        - Inter-task event communication
+├── Logger            - Multi-level logging and telemetry
+└── pins.h            - Hardware pin abstraction
 ```
 
 ### FreeRTOS Tasks
-- **Sensor Task** (Priority 2): 1Hz environmental sensor sampling
-- **Communications Task** (Priority 1): ESP-NOW message handling and LoRa transmission
-- **Command Task** (Priority 1): Serial command processing
+- **Sensor Task** (Priority 2): 1Hz environmental sensor sampling with event broadcasting
+- **Communications Task** (Priority 1): Event-driven ESP-NOW/LoRa handling
+- **Command Task** (Priority 1): Serial command processing with logging
+
+### Event System
+- **EVENT_SENSOR_DATA_READY**: Environmental sensors updated
+- **EVENT_DISTANCE_UPDATED**: ESP-NOW distance received
+- **EVENT_LORA_SEND_REQUEST**: Manual transmission request
+- **EVENT_SYSTEM_ERROR**: Critical system errors
+
+### Logging System
+- **Multi-level filtering**: DEBUG, INFO, WARN, ERROR, CRITICAL
+- **Structured telemetry**: Sensor data, system events, network events
+- **Multi-sink support**: Serial console (network/storage ready for future)
 
 ## Installation
 
@@ -68,10 +99,10 @@ main.cpp           - System initialization and FreeRTOS task creation
 ```ini
 lib_deps = 
     adafruit/Adafruit Unified Sensor
-    adafruit/Adafruit TSL2561
     adafruit/Adafruit HTU21DF Library
+    adafruit/Adafruit TSL2561 Unified
     sandeepmistry/LoRa
-    ESP32_NOW_Serial  ; ESP-NOW communication library
+    https://github.com/yoursunny/ESP32_NOW_Serial.git
 ```
 
 ### Build and Upload
@@ -128,17 +159,40 @@ DIST:45.67
 
 ## Thread Safety
 
-All sensor data access is protected by FreeRTOS mutexes:
+All sensor data access is protected by FreeRTOS mutexes through dedicated access layer:
 
 ```cpp
-// Safe sensor data access
+// Thread-safe sensor data access
 int temp;
 float humidity, distance;
 int lux;
 
+// Atomic read of all sensor values
 if (getAllSensorData(&temp, &humidity, &lux, &distance)) {
-    // Use sensor data safely
+    // Use sensor data safely - all from same moment in time
 }
+
+// Individual sensor access
+if (getSensorTemperature(&temp)) {
+    logInfo("Temperature: %d°C", temp);
+}
+
+// Safe distance updates from ESP-NOW
+setSensorDistance(45.67);
+```
+
+## Logging and Telemetry
+
+```cpp
+// Structured logging
+logInfo("System started successfully");
+logWarn("Sensor not detected - using default values");
+logError("Communication failure - retrying");
+
+// Telemetry data
+logSensorData(temp, humidity, lux, distance);
+logSystemEvent("LORA_INIT", "Radio ready for transmission");
+logNetworkEvent("ESP-NOW", "CONNECTED", "Peer communication established");
 ```
 
 ## Extending the System
@@ -147,11 +201,20 @@ if (getAllSensorData(&temp, &humidity, &lux, &distance)) {
 1. Add sensor initialization to `Sensors.cpp`
 2. Update `SensorData` struct in `GlobalContext.h`
 3. Add thread-safe access functions in `SensorDataAccess.cpp`
+4. Add logging for sensor events
+5. Create events for sensor state changes
 
 ### Adding New Communication Protocols
 1. Create new module (e.g., `WiFiLink.cpp`)
-2. Add task in `Tasks.cpp`
+2. Add task in `Tasks.cpp` with event handling
 3. Update `main.cpp` initialization
+4. Add protocol-specific events to `EventQueue.h`
+5. Integrate with logging system
+
+### Adding New Log Sinks
+1. Add sink type to `LogSink` enum in `Logger.h`
+2. Implement sink logic in `Logger.cpp`
+3. Initialize sink in `initLogger()`
 
 ## Troubleshooting
 
@@ -177,4 +240,5 @@ This project is open source. See LICENSE file for details.
 
 ## Version History
 
+- **v2.0.0** - Production release with event-driven architecture, professional logging, and enhanced thread safety
 - **v1.0** - Initial release with FreeRTOS tasks and thread-safe sensor access

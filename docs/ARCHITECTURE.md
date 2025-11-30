@@ -25,15 +25,21 @@ Pin definitions are centralized in `pins.h` for easy portability across differen
 main.cpp
 ├── GlobalContext (centralized state)
 ├── Tasks (FreeRTOS task management)
+├── EventQueue (inter-task communication)
+├── Logger (structured logging and telemetry)
 ├── Sensors ──┬── pins.h
 │             └── SensorDataAccess (thread-safe access)
 ├── LoRaLink ──┬── pins.h
-│              └── SensorDataAccess
+│              ├── SensorDataAccess
+│              └── Logger
 ├── NowLink ───┬── Config
-│              └── SensorDataAccess
+│              ├── SensorDataAccess
+│              ├── EventQueue
+│              └── Logger
 ├── Config ────── NowLink
 └── Commands ──┬── All modules (for status/control)
-               └── SensorDataAccess
+               ├── SensorDataAccess
+               └── Logger
 ```
 
 ## Data Flow
@@ -56,6 +62,18 @@ main.cpp
 3. Data formatted and transmitted via LoRa radio
 4. Transmission timestamp updated
 
+### Event-Driven Communication
+1. **EventQueue** provides FreeRTOS-based inter-task messaging
+2. Tasks send events for state changes (sensor updates, distance received)
+3. **Communications Task** processes events from queue
+4. Events carry optional data payloads for efficient communication
+
+### Structured Logging
+1. **Logger** provides multi-level filtering (DEBUG to CRITICAL)
+2. Structured telemetry functions for sensor data and system events
+3. Multiple output sinks (Serial console, future network/storage)
+4. Thread-safe operation across all FreeRTOS tasks
+
 ## Task Architecture
 
 ### Task Priorities
@@ -67,6 +85,8 @@ main.cpp
 - **Mutex Protection**: All sensor data access uses `sensorDataMutex`
 - **Timeout Handling**: 100ms timeout prevents deadlocks
 - **Atomic Operations**: Bulk data operations are atomic
+- **Event Queue**: FreeRTOS queue for inter-task communication
+- **Logging Coordination**: Thread-safe logging across all tasks
 
 ## Memory Management
 

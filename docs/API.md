@@ -199,6 +199,81 @@ void initializeGlobalContext();
 // #define BOARD_CUSTOM     // Custom configuration
 ```
 
+## Event Queue System
+
+### Event Types
+
+```cpp
+typedef enum {
+    EVENT_SENSOR_DATA_READY,    // Environmental sensors updated
+    EVENT_DISTANCE_UPDATED,     // ESP-NOW distance received
+    EVENT_LORA_SEND_REQUEST,    // Manual transmission request
+    EVENT_LORA_SEND_COMPLETE,   // LoRa transmission completed
+    EVENT_CONFIG_CHANGED,       // System configuration modified
+    EVENT_SYSTEM_ERROR          // System error occurred
+} EventType;
+```
+
+### Event Queue Functions
+
+```cpp
+bool initEventQueue();
+bool sendEvent(EventType type, uint32_t data = 0, void* ptr = nullptr);
+bool receiveEvent(EventMessage* event, TickType_t timeout = pdMS_TO_TICKS(100));
+bool sendEventFromISR(EventType type, uint32_t data = 0, void* ptr = nullptr);
+```
+
+**Description:** FreeRTOS-based event queue for inter-task communication.
+
+**Features:**
+- Thread-safe event passing between tasks
+- Optional data payloads (32-bit + pointer)
+- ISR-safe event sending
+- Configurable timeouts
+
+## Logging and Telemetry System
+
+### Log Levels
+
+```cpp
+typedef enum {
+    LOG_DEBUG = 0,    // Detailed debugging information
+    LOG_INFO = 1,     // General system information
+    LOG_WARN = 2,     // Warning conditions
+    LOG_ERROR = 3,    // Error conditions
+    LOG_CRITICAL = 4  // Critical errors
+} LogLevel;
+```
+
+### Logging Functions
+
+```cpp
+void initLogger(LogLevel minLevel = LOG_INFO, uint8_t sinks = SINK_SERIAL);
+void setLogLevel(LogLevel level);
+void setLogSinks(uint8_t sinks);
+
+// Level-specific logging
+void logDebug(const char* format, ...);
+void logInfo(const char* format, ...);
+void logWarn(const char* format, ...);
+void logError(const char* format, ...);
+void logCritical(const char* format, ...);
+```
+
+### Telemetry Functions
+
+```cpp
+void logSensorData(int temp, float humidity, int lux, float distance);
+void logSystemEvent(const char* event, const char* details = nullptr);
+void logNetworkEvent(const char* protocol, const char* event, const char* details = nullptr);
+```
+
+**Features:**
+- Multi-level message filtering
+- Structured telemetry data logging
+- Multiple output sinks (Serial, Network, Storage)
+- Thread-safe operation
+
 ## Error Handling
 
 ### Return Values
