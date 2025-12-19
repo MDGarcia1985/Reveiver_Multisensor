@@ -20,10 +20,9 @@
 
 #pragma once
 #include <Arduino.h>
-#include "ESP32_NOW_Serial.h"
-#include "MacAddress.h"
-#include "WiFi.h"
-#include "esp_wifi.h"
+#include <WiFi.h>
+#include <esp_now.h>
+#include <esp_wifi.h>
 
 #define ESPNOW_WIFI_MODE_STATION 1
 #define ESPNOW_WIFI_CHANNEL 1

@@ -31,32 +31,32 @@
 
 bool initializeNowSerial(uint8_t* mac) {
   GlobalContext& ctx = getGlobalContext();
-  if (ctx.nowSerial != nullptr) {
-    delete ctx.nowSerial;
-    ctx.nowSerial = nullptr;
-    ctx.nowSerialActive = false;
-  }
-
+  
   Serial.println("\n--- Initializing ESP-NOW ---");
   Serial.print("My WiFi Mode: ");
   Serial.println("Station");
   Serial.print("Attempting to connect to peer: ");
   printMacAddress(mac);
 
-  MacAddress peer_mac({mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]});
-  ctx.nowSerial = new ESP_NOW_Serial_Class(peer_mac, ESPNOW_WIFI_CHANNEL, ESPNOW_WIFI_IF);
-
-  if (ctx.nowSerial->begin(115200)) {
-    logNetworkEvent("ESP-NOW", "CONNECTED", "Peer communication established");
-    setMacAddress(mac);
-    ctx.nowSerialActive = true;
-    return true;
-  } else {
-    logNetworkEvent("ESP-NOW", "CONNECT_FAILED", "Unable to establish peer communication");
-    delete ctx.nowSerial;
-    ctx.nowSerial = nullptr;
+  if (esp_now_init() != ESP_OK) {
+    logNetworkEvent("ESP-NOW", "INIT_FAILED", "ESP-NOW initialization failed");
     return false;
   }
+
+  esp_now_peer_info_t peerInfo;
+  memcpy(peerInfo.peer_addr, mac, 6);
+  peerInfo.channel = ESPNOW_WIFI_CHANNEL;
+  peerInfo.encrypt = false;
+
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    logNetworkEvent("ESP-NOW", "PEER_ADD_FAILED", "Failed to add peer");
+    return false;
+  }
+
+  logNetworkEvent("ESP-NOW", "CONNECTED", "Peer communication established");
+  setMacAddress(mac);
+  ctx.nowSerialActive = true;
+  return true;
 }
 
 void initializeNowFromEEPROM() {
@@ -66,9 +66,9 @@ void initializeNowFromEEPROM() {
 
   Serial.print("Channel: ");
   Serial.println(ESPNOW_WIFI_CHANNEL);
-  WiFi.setChannel(ESPNOW_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  esp_wifi_set_channel(ESPNOW_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
 
-  while (!(WiFi.STA.started() || WiFi.AP.started())) {
+  while (WiFi.status() != WL_CONNECTED && WiFi.getMode() == WIFI_STA) {
     delay(100);
   }
 
@@ -145,30 +145,14 @@ namespace {
 
 void handleNowMessages() {
   GlobalContext &ctx = getGlobalContext();
-  auto *now = ctx.nowSerial;
-
-  // Fast exit if nothing to do
-  if (!ctx.nowSerialActive || now == nullptr || !now->available()) {
+  
+  // Fast exit if ESP-NOW not active
+  if (!ctx.nowSerialActive) {
     return;
   }
-
-  int bytesProcessed = 0;
-
-  while (now->available() && bytesProcessed < MAX_BYTES_PER_LOOP) {
-    char c = now->read();
-    ++bytesProcessed;
-
-    if (c == '\n') {
-      handleCompleteNowLine(ctx);
-    } else if (isPrintableNowChar(c)) {
-      if (ctx.receivedMessageLen < (int)sizeof(ctx.receivedMessageBuffer) - 1) {
-        ctx.receivedMessageBuffer[ctx.receivedMessageLen++] = c;
-      } else {
-        // Overflow: drop current line
-        ctx.receivedMessageLen = 0;
-      }
-    }
-    // (all other chars are ignored)
-  }
+  
+  // ESP-NOW message handling is now done via callback
+  // This function is kept for compatibility but messages
+  // are processed in the ESP-NOW receive callback
 }
 

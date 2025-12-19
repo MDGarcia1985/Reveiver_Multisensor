@@ -20,7 +20,6 @@
 
 #pragma once
 #include <Arduino.h>
-#include "ESP32_NOW_Serial.h"
 
 struct SensorData {
   int temperature;
@@ -40,7 +39,6 @@ struct GlobalContext {
   bool loraActive;
   
   // ESP-NOW state
-  ESP_NOW_Serial_Class* nowSerial;
   bool nowSerialActive;
   uint8_t peerMacAddress[6];
   bool macAddressSet;
